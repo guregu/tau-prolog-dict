@@ -1,0 +1,29 @@
+{
+  "name": "tau-prolog-dict",
+  "version": "0.0.1",
+  "description": "dictionary for Tau Prolog",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "prepublish": "npm x tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guregu/tau-prolog-dict.git"
+  },
+  "keywords": [
+    "tau-prolog"
+  ],
+  "author": "guregu",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/guregu/tau-prolog-dict/issues"
+  },
+  "homepage": "https://github.com/guregu/tau-prolog-dict#readme",
+  "devDependencies": {
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "tau-prolog": "^0.3.3"
+  }
+}
