@@ -30,7 +30,7 @@ export default function(pl2: typeof pl) {
 
 export class Dict {
 	map: Record<string, pl.type.Value>;
-	tag = "&";
+	tag = "&"; // TODO: make Var by default, add to constructor
 	id = this.tag;
 	indicator = this.id + "{}/1";
 	ground: boolean;
@@ -305,7 +305,7 @@ function get_dict3(thread: pl.type.Thread, point: pl.type.State, atom: pl.type.T
 	}
 	const value = atom.args[2];
 	if (pl.type.is_atom(key)) {
-		const v = (dict as unknown as Dict).map[key.id]; // TODO
+		const v = mapify(dict)[key.id];
 		if (!v) {
 			return;
 		}

@@ -8,7 +8,7 @@ Experimental.
 
 Supports most of the same predicates as SWI. Does not support functional syntax. 
 
-Note that this package doesn't support the `tag{}` syntax for dictionaries. You have to use `create_dict/3` to make one.
+Note that this package doesn't support the `tag{}` syntax for dictionaries. You have to use `dict_create/3` to make one.
 
 See: https://www.swi-prolog.org/pldoc/man?section=ext-dict-predicates
 
