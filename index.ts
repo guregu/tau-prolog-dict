@@ -22,8 +22,8 @@ export default function(pl2: typeof pl) {
 
 	pl2.type.is_dict = function(obj) {
 		return (obj instanceof pl2.type.Dict) || (
-			pl2.type.is_term(obj) && obj?.args?.length === 1 && 
-			pl2.type.is_term(obj.args[0]) &&  obj?.args[0]?.indicator === "{}/1"
+			pl2.type.is_term(obj) && obj.args.length === 1 && 
+			pl2.type.is_term(obj.args[0]) &&  obj.args[0].indicator === "{}/1"
 		);
 	};
 
@@ -204,6 +204,18 @@ export class Dict {
 			if (pl.type.is_dict(v) && !(v instanceof Dict)) {
 				return [k, new Dict(mapify(v)).toJavaScript()]; // hack
 			}
+			if (pl.type.is_term(v) && v.indicator === "@/1" && pl.type.is_atom(v.args[0])) {
+				switch (v.args[0].indicator) {
+				case "true/0":
+					return [k, true];
+				case "false/0":
+					return [k, false];
+				case "null/0":
+					return [k, null];
+				case "undefined/0":
+					return [k, undefined];
+				}
+			}
 			return [k, v.toJavaScript()];
 		});
 		return Object.fromEntries(jsed);
@@ -317,7 +329,7 @@ function listifyDict(thread: pl.type.Thread, atom: pl.type.Term<number, string>,
 
 function dict_pairs3(thread: pl.type.Thread, point: pl.type.State, atom: pl.type.Term<number, string>) {
 	const dict = atom.args[0];
-	// const tag = atom.args[1]; // TODO: unused
+	//const tag = atom.args[1]; // TODO: unused
 	const pairs = atom.args[2];
 
 	if (pl.type.is_list(pairs)) {
