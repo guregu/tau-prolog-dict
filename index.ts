@@ -28,8 +28,16 @@ export default function(pl2: typeof pl) {
 	};
 
 	pl2.type.Dict = Dict;
-
 	pl2.type.order.push( pl2.type.Dict );
+
+	// hack to json marshal dicts
+	const term2js = pl2.type.Term.prototype.toJavaScript;
+	pl2.type.Term.prototype.toJavaScript = function() {
+		if (pl2.type.is_dict(this)) {
+			return new Dict(mapify(this)).toJavaScript();
+		}
+		return term2js.apply(this, arguments);
+	};
 }
 
 export class Dict {
@@ -201,9 +209,9 @@ export class Dict {
 
 	toJavaScript() {
 		const jsed = Object.entries(this.map).map(([k, v]) => {
-			if (pl.type.is_dict(v) && !(v instanceof Dict)) {
-				return [k, new Dict(mapify(v)).toJavaScript()]; // hack
-			}
+			// if (pl.type.is_dict(v) && !(v instanceof Dict)) {
+			// 	return [k, new Dict(mapify(v)).toJavaScript()]; // hack
+			// }
 			if (pl.type.is_term(v) && v.indicator === "@/1" && pl.type.is_atom(v.args[0])) {
 				switch (v.args[0].indicator) {
 				case "true/0":
