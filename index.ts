@@ -21,7 +21,7 @@ export default function(pl2: typeof pl) {
 
 	pl2.type.is_dict = function( obj ) {
 		return (obj instanceof pl2.type.Dict) || (
-			pl2.type.is_term(obj) && pl.args.length === 1 && 
+			pl2.type.is_term(obj) && pl.args[0].length === 1 && 
 			pl2.type.is_term(pl.args[0]) &&  pl.args[0].indicator === "{}/1"
 		);
 	};
