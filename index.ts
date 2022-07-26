@@ -6,6 +6,7 @@ import pl from "tau-prolog";
 const predicates: Record<string, pl.type.PredicateFn> = {
 	"is_dict/1": is_dict1,
 	"dict_create/3": dict_create3,
+	"dict_pairs/3": dict_pairs3,
 	"get_dict/3": get_dict3,
 	"put_dict/3": put_dict3,
 	"put_dict/4": put_dict4,
@@ -19,10 +20,10 @@ const predicates: Record<string, pl.type.PredicateFn> = {
 export default function(pl2: typeof pl) {
 	new pl2.type.Module("dict", predicates, Object.keys(predicates), {dependencies: ["js"]});
 
-	pl2.type.is_dict = function( obj ) {
+	pl2.type.is_dict = function(obj) {
 		return (obj instanceof pl2.type.Dict) || (
-			pl2.type.is_term(obj) && pl.args[0].length === 1 && 
-			pl2.type.is_term(pl.args[0]) &&  pl.args[0].indicator === "{}/1"
+			pl2.type.is_term(obj) && obj?.args?.length === 1 && 
+			pl2.type.is_term(obj.args[0]) &&  obj?.args[0]?.indicator === "{}/1"
 		);
 	};
 
@@ -199,7 +200,12 @@ export class Dict {
 	}
 
 	toJavaScript() {
-		const jsed = Object.entries(this.map).map(([k, v]) => [k, v.toJavaScript()]);
+		const jsed = Object.entries(this.map).map(([k, v]) => {
+			if (pl.type.is_dict(v) && !(v instanceof Dict)) {
+				return [k, new Dict(mapify(v)).toJavaScript()]; // hack
+			}
+			return [k, v.toJavaScript()];
+		});
 		return Object.fromEntries(jsed);
 	}
 
@@ -221,7 +227,7 @@ function isGround(obj) {
 
 function mapify(term: pl.type.Term<number, string>): Record<string, pl.type.Value> | undefined {
 	const map = {};
-	if (pl.type.is_dict(term)) {
+	if (term instanceof Dict) {
 		return term.map;
 	}
 	if (!pl.type.is_term(term) || term.args.length != 1 || term.args[0].indicator !== "{}/1") {
@@ -268,6 +274,16 @@ function dict_create3(thread: pl.type.Thread, point: pl.type.State, atom: pl.typ
 		return;
 	}
 	let ptr = atom.args[2];
+	const map = mapifyList(thread, atom, ptr);
+	const newDict = new Dict(map);
+	thread.prepend([new pl.type.State(
+		point.goal.replace(new pl.type.Term("=", [dict, newDict])),
+		point.substitution,
+		point
+	)]);
+}
+
+function mapifyList(thread: pl.type.Thread, atom: pl.type.Term<number, string>, ptr: pl.type.Term<number, string>) {
 	if (!pl.type.is_list(ptr)) {
 		thread.throw_error(pl.error.type("list", ptr, "dict_create/3"));
 		return;
@@ -288,12 +304,51 @@ function dict_create3(thread: pl.type.Thread, point: pl.type.State, atom: pl.typ
 		map[key.id] = val;
 		ptr = ptr.args[1];
 	}
-	const newDict = new Dict(map);
+	return map;
+}
+
+function listifyDict(thread: pl.type.Thread, atom: pl.type.Term<number, string>, dict) {
+	if (!(dict instanceof Dict)) {
+		dict = new Dict(mapify(dict));
+	}
+	const pairs = Object.entries(dict.map).map(([k, v]) => new pl.type.Term("-", [new pl.type.Term(k), v]));
+	return makeList(pairs);
+}
+
+function dict_pairs3(thread: pl.type.Thread, point: pl.type.State, atom: pl.type.Term<number, string>) {
+	const dict = atom.args[0];
+	// const tag = atom.args[1]; // TODO: unused
+	const pairs = atom.args[2];
+
+	if (pl.type.is_list(pairs)) {
+		const map = mapifyList(thread, atom, pairs);
+		if (!map) {
+			return;
+		}
+		const newDict = new Dict(map);
+		thread.prepend([new pl.type.State(
+			point.goal.replace(new pl.type.Term("=", [dict, newDict])),
+			point.substitution,
+			point
+		)]);
+		return;
+	}
+
+	if (pl.type.is_variable(dict)) {
+		thread.throw_error(pl.error.instantiation(atom.indicator));
+		return;
+	}
+	if (!pl.type.is_dict(dict)) {
+		thread.throw_error(pl.error.type("dict", dict, atom.indicator));
+		return;
+	}
+	const list = listifyDict(thread, atom, dict);
 	thread.prepend([new pl.type.State(
-		point.goal.replace(new pl.type.Term("=", [dict, newDict])),
+		point.goal.replace(new pl.type.Term("=", [pairs, list])),
 		point.substitution,
 		point
 	)]);
+	return;
 }
 
 // get_dict(?Key, +Dict, -Value)
@@ -604,4 +659,12 @@ function reviver(k: string, v: any): any {
 	return new Dict(
 		Object.fromEntries(Object.entries(v).map(([k, v]) => [k, reviver("", v)]))
 	);
+}
+
+function makeList(array: pl.type.Value[] = [], cons = new pl.type.Term("[]", [])) {
+	let list = cons;
+	for (let i = array.length - 1; i >= 0; i--) {
+		list = new pl.type.Term(".", [array[i], list]);
+	}
+	return list;
 }
