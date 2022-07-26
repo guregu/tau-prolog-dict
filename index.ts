@@ -20,7 +20,10 @@ export default function(pl2: typeof pl) {
 	new pl2.type.Module("dict", predicates, Object.keys(predicates), {dependencies: ["js"]});
 
 	pl2.type.is_dict = function( obj ) {
-		return obj instanceof pl2.type.Dict;
+		return (obj instanceof pl2.type.Dict) || (
+			pl2.type.is_term(obj) && pl.args.length === 1 && 
+			pl2.type.is_term(pl.args[0]) &&  pl.args[0].indicator === "{}/1"
+		);
 	};
 
 	pl2.type.Dict = Dict;
@@ -40,7 +43,6 @@ export class Dict {
 		this.ground = isGround(map);
 	}
 
-	// TODO: unify with &({...}) term
 	unify(obj: pl.type.Value, occurs_check: boolean) {
 		// const y = (obj as unknown as Dict).map;
 		const y = mapify(obj);
@@ -198,8 +200,7 @@ export class Dict {
 
 	toJavaScript() {
 		const jsed = Object.entries(this.map).map(([k, v]) => [k, v.toJavaScript()]);
-		return new Dict(Object.fromEntries(jsed));
-		// return this.map;
+		return Object.fromEntries(jsed);
 	}
 
 	// not sure what this is for
@@ -518,23 +519,48 @@ function projectBoth(thread: pl.type.Thread, point: pl.type.State, atom: pl.type
 	return;
 }
 
+function atom_json_dict3_obj_(thread: pl.type.Thread, atom: pl.type.Term<number, string>, dict: unknown): unknown {
+	if (pl.type.is_variable(dict)) {
+		thread.throw_error(pl.error.instantiation(atom.indicator));
+		return;
+	}
+
+	if (pl.type.is_list(dict)) {
+		let obj = [];
+		let ptr = dict as pl.type.Term<number, string>;
+		while(pl.type.is_term(ptr) && ptr.indicator === "./2" ) {
+			const elem = atom_json_dict3_obj_(thread, atom, ptr.args[0]);
+			if (!elem) {
+				return; // threw
+			}
+			obj.push(elem)
+			ptr = ptr.args[1];
+		}
+		return obj;
+	} else if (!pl.type.is_dict(dict)) {
+		thread.throw_error(pl.error.type("dict", dict, atom.indicator));
+		return;
+	} else {
+		if (!(dict instanceof Dict)) {
+			dict = new Dict(mapify(dict));
+		}
+		return (dict as pl.type.Value).toJavaScript();
+	}
+}
+
 // atom_json_dict(+Atom, -JSONDict, +Options).
 // atom_json_dict(-Text, +JSONDict, +Options).
 function atom_json_dict3(thread: pl.type.Thread, point: pl.type.State, atom: pl.type.Term<number, string>) {
 	const text = atom.args[0];
-	const dict = atom.args[1];
+	let dict = atom.args[1];
 	// const opts = atom.args[2];
 	if (pl.type.is_variable(text)) {
-		if (pl.type.is_variable(dict)) {
-			thread.throw_error(pl.error.instantiation(atom.indicator));
-			return;
-		}
-		if (!pl.type.is_dict(dict)) {
-			thread.throw_error(pl.error.type("dict", dict, atom.indicator));
-			return;
-		}
 		// TODO: check ground?
-		const json = new pl.type.Term(JSON.stringify(dict.toJavaScript()));
+		const obj = atom_json_dict3_obj_(thread, atom, dict);
+		if (!obj) {
+			return; // threw
+		}
+		const json = new pl.type.Term(JSON.stringify(obj));
 		thread.prepend([new pl.type.State(
 			point.goal.replace(new pl.type.Term("=", [text, json])),
 			point.substitution,
