@@ -130,8 +130,10 @@ export class Dict {
 		}
 		// TODO:
 		this.changed();
-		obj.changed();
-		if (rest) {
+		if (obj.changed) {
+			obj.changed();
+		};
+		if (rest && rest.changed) {
 			rest.changed();
 		}
 		return sub;
@@ -376,7 +378,7 @@ function get_dict3(thread: pl.type.Thread, point: pl.type.State, atom: pl.type.T
 	const key = atom.args[0];
 	const dict = atom.args[1];
 	if (pl.type.is_variable(dict)) {
-		thread.throw_error(pl.error.instantiation("get_dict/3"));
+		thread.throw_error(pl.error.instantiation(atom.indicator));
 		return;
 	}
 	const value = atom.args[2];
@@ -407,7 +409,7 @@ function get_dict3(thread: pl.type.Thread, point: pl.type.State, atom: pl.type.T
 		}));
 		return;
 	}
-	thread.throw_error(pl.error.type("atom", key, "get_dict/3"));
+	thread.throw_error(pl.error.type("atom", key, atom.indicator));
 }
 
 
@@ -415,19 +417,19 @@ function get_dict3(thread: pl.type.Thread, point: pl.type.State, atom: pl.type.T
 function put_dict3(thread: pl.type.Thread, point: pl.type.State, atom: pl.type.Term<number, string>) {
 	const put = atom.args[0];
 	if (pl.type.is_variable(put)) {
-		thread.throw_error(pl.error.instantiation("put_dict/3"));
+		thread.throw_error(pl.error.instantiation(atom.indicator));
 	}
 	if (!pl.type.is_dict(put)) {
-		thread.throw_error(pl.error.type("dict", put, "put_dict/3"));
+		thread.throw_error(pl.error.type("dict", put, atom.indicator));
 		return;
 	}
 	const dict = atom.args[1];
 	if (pl.type.is_variable(dict)) {
-		thread.throw_error(pl.error.instantiation("put_dict/3"));
+		thread.throw_error(pl.error.instantiation(atom.indicator));
 		return;
 	}
 	if (!pl.type.is_dict(dict)) {
-		thread.throw_error(pl.error.type("dict", dict, "put_dict/3"));
+		thread.throw_error(pl.error.type("dict", dict, atom.indicator));
 		return;
 	}
 	const copy = dict.clone() as unknown as Dict;
@@ -674,7 +676,7 @@ function reviver(k: string, v: any): any {
 		return v;
 	}
 	if (Array.isArray(v)) {
-		return v.map((x, i) => reviver(String(i), x))
+		return makeList(v.map((x, i) => reviver(String(i), x)))
 	}
 	return new Dict(
 		Object.fromEntries(Object.entries(v).map(([k, v]) => [k, reviver("", v)]))
